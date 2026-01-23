@@ -2,7 +2,7 @@
   <!-- TurtleBot3 Modell -->
   <env name="TURTLEBOT3_MODEL" value="waffle_pi"/>
 
-  <!-- Map (gemäß Anleitung: map_file:=/home/username/foyer_try1.yaml) -->
+  <!-- Map -->
   <arg name="map_file" default="$(env HOME)/foyer_try1.yaml"/>
 
   <!-- Startpunkt im map-Frame (AMCL Initialpose) -->
@@ -10,21 +10,13 @@
   <arg name="start_y" default="-26.9"/>
   <arg name="start_yaw_deg" default="0.0"/>
 
-  <!-- 1) Gazebo Empty World -->
-  <include file="$(find turtlebot3_gazebo)/launch/turtlebot3_empty_world.launch"/>
-
-  <!-- 2) Navigation (inkl. map_server, AMCL, RViz) -->
-  <include file="$(find turtlebot3_navigation)/launch/turtlebot3_navigation.launch">
-    <arg name="map_file" default="$(find movement_api)/map/foyer_try1.yaml"/>
-  </include>
-
-  <!-- 3) Movement API 2.0 Node (gemäß Anleitung: rosrun movement_api movement_node.py) -->
+  <!-- 1) Movement API -->
   <node pkg="movement_api" type="movement_node.py" name="movement_node" output="screen">
     <!-- optional: Parameter/Remaps nach Bedarf -->
     <!-- <param name="target_topic" value="/navbot/target_pose"/> -->
   </node>
 
-  <!-- 4) Initialpose robust setzen (für RViz/AMCL) -->
+  <!-- 2) Initialpose robust setzen (für AMCL) -->
   <node pkg="movement_api" type="publish_initial_pose.py" name="publish_initial_pose" output="screen">
     <param name="x" value="$(arg start_x)"/>
     <param name="y" value="$(arg start_y)"/>
