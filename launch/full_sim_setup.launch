@@ -1,8 +1,7 @@
-<launch>
+launch>
   <!-- REAL ROBOT -->
   <param name="/use_sim_time" value="false"/>
 
-  <!-- Modell (oft auch vorher exportiert) -->
   <env name="TURTLEBOT3_MODEL" value="waffle_pi"/>
 
   <!-- Map -->
@@ -13,28 +12,35 @@
   <arg name="start_y" default="-26.9"/>
   <arg name="start_yaw_deg" default="0.0"/>
 
-  <!-- 1) Robot bringup läuft typischerweise separat auf dem Robot:
-       roslaunch turtlebot3_bringup turtlebot3_robot.launch
-       (liefert /scan, odom->base_*, etc.)
-  -->
+  <!-- Robot Description -->
+  <param name="robot_description" command="$(find xacro)/xacro $(find turtlebot3_description)/urdf/turtlebot3_waffle_pi.urdf.xacro"/>
 
-  <!-- 2) Navigation Stack (map_server + amcl + move_base) -->
-  <include file="$(find turtlebot3_navigation)/launch/turtlebot3_navigation.launch">
-    <arg name="map_file" value="$(arg map_file)"/>
+  <!-- Robot State Publisher -->
+  <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher"/>
+
+  <!-- Map Server -->
+  <node pkg="map_server" type="map_server" name="map_server" args="$(arg map_file)"/>
+
+  <!-- AMCL -->
+  <include file="$(find turtlebot3_navigation)/launch/amcl.launch"/>
+
+  <!-- move_base OHNE RViz -->
+  <include file="$(find turtlebot3_navigation)/launch/move_base.launch">
+    <arg name="model" value="waffle_pi"/>
   </include>
 
-  <!-- 3) Initialpose setzen (private params!) -->
+  <!-- Initial Pose Publisher -->
   <node pkg="movement_api" type="publish_initial_pose.py" name="publish_initial_pose" output="screen">
-    <param name="~x" value="$(arg start_x)"/>
-    <param name="~y" value="$(arg start_y)"/>
-    <param name="~yaw_deg" value="$(arg start_yaw_deg)"/>
-    <param name="~frame_id" value="map"/>
-
-    <param name="~timeout_sec" value="30.0"/>
-    <param name="~repeat" value="10"/>
-    <param name="~rate_hz" value="2.0"/>
+    <param name="x" value="$(arg start_x)"/>
+    <param name="y" value="$(arg start_y)"/>
+    <param name="yaw_deg" value="$(arg start_yaw_deg)"/>
+    <param name="frame_id" value="map"/>
+    <param name="timeout_sec" value="30.0"/>
+    <param name="repeat" value="10"/>
+    <param name="rate_hz" value="2.0"/>
   </node>
 
-  <!-- 4) Deine Movement API -->
+  <!-- Movement API -->
   <node pkg="movement_api" type="movement_node.py" name="movement_node" output="screen"/>
 </launch>
+
