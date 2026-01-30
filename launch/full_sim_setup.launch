@@ -1,36 +1,40 @@
 <launch>
-  <!-- TurtleBot3 Modell -->
+  <!-- REAL ROBOT -->
+  <param name="/use_sim_time" value="false"/>
+
+  <!-- Modell (oft auch vorher exportiert) -->
   <env name="TURTLEBOT3_MODEL" value="waffle_pi"/>
 
   <!-- Map -->
-  <arg name="map_file" default="$(env HOME)/foyer_try1.yaml"/>
+  <arg name="map_file" default="$(find movement_api)/map/foyer_try1.yaml"/>
 
-  <!-- Startpunkt im map-Frame (AMCL Initialpose) -->
+  <!-- Startpose -->
   <arg name="start_x" default="21.4"/>
   <arg name="start_y" default="-26.9"/>
   <arg name="start_yaw_deg" default="0.0"/>
 
-  <!-- 1) Movement API -->
-  <node pkg="movement_api" type="movement_node.py" name="movement_node" output="screen">
-    <!-- optional: Parameter/Remaps nach Bedarf -->
-    <!-- <param name="target_topic" value="/navbot/target_pose"/> -->
-  </node>
+  <!-- 1) Robot bringup läuft typischerweise separat auf dem Robot:
+       roslaunch turtlebot3_bringup turtlebot3_robot.launch
+       (liefert /scan, odom->base_*, etc.)
+  -->
 
-  <!-- 2) Initialpose robust setzen (für AMCL) -->
+  <!-- 2) Navigation Stack (map_server + amcl + move_base) -->
+  <include file="$(find turtlebot3_navigation)/launch/turtlebot3_navigation.launch">
+    <arg name="map_file" value="$(arg map_file)"/>
+  </include>
+
+  <!-- 3) Initialpose setzen (private params!) -->
   <node pkg="movement_api" type="publish_initial_pose.py" name="publish_initial_pose" output="screen">
-    <param name="x" value="$(arg start_x)"/>
-    <param name="y" value="$(arg start_y)"/>
-    <param name="yaw_deg" value="$(arg start_yaw_deg)"/>
-    <param name="frame_id" value="map"/>
+    <param name="~x" value="$(arg start_x)"/>
+    <param name="~y" value="$(arg start_y)"/>
+    <param name="~yaw_deg" value="$(arg start_yaw_deg)"/>
+    <param name="~frame_id" value="map"/>
 
-    <!-- Robustheitsparameter -->
-    <param name="timeout_sec" value="30.0"/>
-    <param name="repeat" value="10"/>
-    <param name="rate_hz" value="2.0"/>
-
-    <!-- Bei Multi-Robot später wichtig: Topic pro Namespace -->
-    <!-- <param name="initialpose_topic" value="/initialpose"/> -->
+    <param name="~timeout_sec" value="30.0"/>
+    <param name="~repeat" value="10"/>
+    <param name="~rate_hz" value="2.0"/>
   </node>
 
+  <!-- 4) Deine Movement API -->
+  <node pkg="movement_api" type="movement_node.py" name="movement_node" output="screen"/>
 </launch>
-

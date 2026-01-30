@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import math
+import time
 import rospy
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from tf.transformations import quaternion_from_euler
@@ -7,27 +8,32 @@ from tf.transformations import quaternion_from_euler
 def wait_for_sim_time(timeout_sec: float) -> bool:
     """
     Wait until /clock is running (rospy.Time.now() > 0) when use_sim_time is enabled.
-    Uses wall-clock timeout to avoid hanging forever.
+    Uses wall-clock timeout (monotonic) to avoid hanging forever.
     """
-    wall_start = rospy.get_time()
+    start = time.monotonic()
     rate = rospy.Rate(20)
     while not rospy.is_shutdown():
+        # In sim time, now() stays 0 until /clock arrives.
         if rospy.Time.now().to_sec() > 0.0:
             return True
-        if (rospy.get_time() - wall_start) > timeout_sec:
+
+        if (time.monotonic() - start) > timeout_sec:
             return False
+
         rate.sleep()
     return False
 
 def wait_for_subscriber(pub, timeout_sec: float) -> bool:
-    """Wait until at least one subscriber is connected to the publisher."""
-    wall_start = rospy.get_time()
+    """Wait until at least one subscriber is connected to the publisher (wall-clock timeout)."""
+    start = time.monotonic()
     rate = rospy.Rate(20)
     while not rospy.is_shutdown():
         if pub.get_num_connections() > 0:
             return True
-        if (rospy.get_time() - wall_start) > timeout_sec:
+
+        if (time.monotonic() - start) > timeout_sec:
             return False
+
         rate.sleep()
     return False
 
@@ -50,12 +56,20 @@ def main():
 
     pub = rospy.Publisher(initialpose_topic, PoseWithCovarianceStamped, queue_size=1)
 
-    rospy.loginfo(f"[publish_initial_pose] Publishing to: {initialpose_topic}")
-    rospy.loginfo("[publish_initial_pose] Waiting for simulation time (/clock) ...")
-    if not wait_for_sim_time(timeout_sec):
-        rospy.logwarn("[publish_initial_pose] Timeout waiting for /clock. Publishing anyway (AMCL may ignore early messages).")
+    use_sim = rospy.get_param("/use_sim_time", False)
+    rospy.loginfo("[publish_initial_pose] Publishing to: %s", initialpose_topic)
+    rospy.loginfo("[publish_initial_pose] use_sim_time=%s", str(use_sim).lower())
 
-    rospy.loginfo("[publish_initial_pose] Waiting for AMCL subscriber ...")
+    # Only wait for /clock if sim-time is enabled
+    if use_sim:
+        rospy.loginfo("[publish_initial_pose] Waiting for simulation time (/clock) ...")
+        if not wait_for_sim_time(timeout_sec):
+            rospy.logwarn("[publish_initial_pose] Timeout waiting for /clock. Publishing anyway.")
+    else:
+        rospy.loginfo("[publish_initial_pose] Real-time mode: not waiting for /clock.")
+
+    # Optional: wait for AMCL subscription
+    rospy.loginfo("[publish_initial_pose] Waiting for subscriber on %s ...", initialpose_topic)
     if not wait_for_subscriber(pub, timeout_sec):
         rospy.logwarn("[publish_initial_pose] Timeout waiting for subscriber. Publishing anyway.")
     else:
@@ -83,6 +97,7 @@ def main():
 
     rate = rospy.Rate(rate_hz)
     for i in range(repeat):
+        # In real-time mode this is wall-clock; in sim-time it is /clock time.
         msg.header.stamp = rospy.Time.now()
         pub.publish(msg)
         rospy.loginfo("[publish_initial_pose] %d/%d: x=%.3f y=%.3f yaw_deg=%.2f frame=%s",
